@@ -1,153 +1,3 @@
-Code.gs
-
-// 網頁應用程式進入點
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
-      .evaluate()
-      .setTitle('文字委託排單系統')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
-function getSheetByName(name) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    sheet = ss.insertSheet(name);
-  }
-  return sheet;
-}
-
-// 提交「輸入頁面」資料
-function submitOrder(formData) {
-  try {
-    var sheet = getSheetByName("排單系統");
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["時間", "暱稱/FB姓名", "委託類型", "委託字數", "付款方式", "指定日期", "委託進度"]);
-    }
-    
-    var timestamp = new Date();
-    // 強制格式化時間為純文字，避免後續讀取出錯
-    var timeStr = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), "yyyy/MM/dd HH:mm:ss");
-    
-    var name = formData.name;
-    var type = formData.type;
-    var words = formData.words;
-    var payment = formData.payment;
-    var requiredDate = formData.requiredDate ? formData.requiredDate : "無";
-    var status = "排單中";
-    
-    sheet.appendRow([timeStr, name, type, words, payment, requiredDate, status]);
-    
-    // 計算預計完稿日期 (填寫日 + 14天)
-    var estDate = new Date(timestamp.getTime() + 14 * 24 * 60 * 60 * 1000);
-    var estDateStr = estDate.getFullYear() + "/" + (estDate.getMonth() + 1) + "/" + estDate.getDate();
-    
-    return {
-      success: true,
-      data: {
-        name: name,
-        type: type,
-        words: words,
-        payment: payment,
-        requiredDate: requiredDate,
-        estDate: estDateStr,
-        status: status
-      }
-    };
-  } catch (e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-// 取得「排單頁面」列表 (優化：改用 getDisplayValues 避免日期物件卡死)
-function getOrderList() {
-  try {
-    var sheet = getSheetByName("排單系統");
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return [];
-    
-    // 抓取畫面上顯示的純文字值
-    var values = sheet.getRange(2, 1, lastRow - 1, 7).getDisplayValues();
-    var orders = [];
-    
-    for (var i = 0; i < values.length; i++) {
-      var row = values[i];
-      
-      // 解析原本填寫的時間，用來推算 +14天
-      var timestamp = new Date(row[0]);
-      var estDateStr = "無";
-      if(!isNaN(timestamp.getTime())) {
-        var estDate = new Date(timestamp.getTime() + 14 * 24 * 60 * 60 * 1000);
-        estDateStr = estDate.getFullYear() + "/" + (estDate.getMonth() + 1) + "/" + estDate.getDate();
-      }
-      
-      orders.push({
-        name: row[1],
-        type: row[2],
-        words: row[3],
-        payment: row[4],
-        requiredDate: row[5] ? row[5] : "無",
-        estDate: estDateStr,
-        status: row[6] ? row[6] : "排單中"
-      });
-    }
-    return orders;
-  } catch (e) {
-    return [];
-  }
-}
-
-// 提交「委託回饋」資料
-function submitFeedback(formData) {
-  try {
-    var sheet = getSheetByName("委託回饋");
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["Message Date", "User", "Level", "Message"]);
-    }
-    
-    var timestamp = new Date();
-    var dateStr = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), "yyyy/MM/dd");
-    
-    sheet.appendRow([dateStr, formData.user, formData.level, formData.message]);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-// 取得所有「委託回饋」
-function getFeedbackList() {
-  try {
-    var sheet = getSheetByName("委託回饋");
-    var lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return [];
-    
-    var values = sheet.getRange(2, 1, lastRow - 1, 4).getDisplayValues();
-    var feedbacks = [];
-    
-    for (var i = 0; i < values.length; i++) {
-      var row = values[i];
-      feedbacks.push({
-        date: row[0],
-        user: row[1],
-        level: row[2],
-        message: row[3]
-      });
-    }
-    return feedbacks;
-  } catch (e) {
-    return [];
-  }
-}
-
-
-Index.html
-
-<!DOCTYPE html>
 <html>
   <head>
     <base target="_top">
@@ -405,7 +255,6 @@ Index.html
         <hr style="border: none; border-top: 1px solid #dcd1f9; margin-bottom: 20px;">
         <div id="modal-body" class="modal-body-text">文章內容載入中...</div>
       </div>
-    </div>
 
     <script>
       function switchPage(pageId) {
@@ -558,8 +407,6 @@ Index.html
     </script>
   </body>
 </html>
-
-Stylesheet.html
 
 <style>
   :root {
